@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аналитический портал — демо-встраивание ассистента</title>
+  <link rel="stylesheet" href="/widget/assistant.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 250px;
+      background: #0f172a;
+      color: #cbd5e1;
+      padding: 20px 0;
+      flex-shrink: 0;
+    }
+    .sidebar h1 { font-size: 16px; color: #fff; padding: 0 20px 16px; border-bottom: 1px solid #1e293b; }
+    .sidebar .section { padding: 14px 20px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; }
+    .sidebar a {
+      display: block;
+      padding: 9px 20px;
+      color: #cbd5e1;
+      text-decoration: none;
+      font-size: 14px;
+      border-left: 3px solid transparent;
+    }
+    .sidebar a:hover { background: #1e293b; }
+    .sidebar a.active { background: #1e293b; color: #fff; border-left-color: #3b82f6; }
+
+    .workspace { flex: 1; padding: 24px 28px; }
+    .workspace h2 { font-size: 22px; margin-bottom: 4px; }
+    .workspace .meta { font-size: 12.5px; color: #6b7280; margin-bottom: 18px; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .kpi-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+    .kpi-card .label { font-size: 12.5px; color: #6b7280; }
+    .kpi-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .kpi-card .delta { font-size: 12.5px; margin-top: 2px; }
+    .delta.up { color: #16a34a; }
+    .delta.down { color: #dc2626; }
+
+    .dash-frame {
+      background: #fff;
+      border: 2px solid transparent;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      transition: border-color 0.3s ease;
+    }
+    .dash-frame.flash { animation: flash 1.6s ease; }
+    @keyframes flash {
+      0% { border-color: #3b82f6; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.25); }
+      100% { border-color: transparent; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08); }
+    }
+    .dash-frame .note { font-size: 13px; color: #6b7280; }
+    .dash-frame code { background: #f1f5f9; padding: 2px 6px; border-radius: 6px; font-size: 12.5px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <h1>Аналитический портал</h1>
+      <div class="section">Коммерция</div>
+      <a href="#" data-view="/dashboards/sales" class="active">Продажи и выручка</a>
+      <a href="#" data-view="/dashboards/regions">Продажи по регионам</a>
+      <a href="#" data-view="/dashboards/clients">Клиентская база</a>
+      <div class="section">Финансы</div>
+      <a href="#" data-view="/dashboards/pnl">Финансовый результат (P&L)</a>
+      <div class="section">HR</div>
+      <a href="#" data-view="/dashboards/hr">Персонал</a>
+      <div class="section">Маркетинг</div>
+      <a href="#" data-view="/dashboards/marketing">Маркетинг и воронка</a>
+    </nav>
+
+    <main class="workspace">
+      <h2 id="dash-title">Продажи и выручка</h2>
+      <div class="meta" id="dash-meta">Обновлено: 07.11.2026, 06:00 · источник: витрина DWH (демо)</div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="label">Выручка YTD</div>
+          <div class="value">8 214 млн ₽</div>
+          <div class="delta up">+2,1% к АППГ</div>
+        </div>
+        <div class="kpi-card">
+          <div class="label">Число сделок YTD</div>
+          <div class="value">1 344</div>
+          <div class="delta up">+6,4% к АППГ</div>
+        </div>
+        <div class="kpi-card">
+          <div class="label">Выполнение плана</div>
+          <div class="value">95,3%</div>
+          <div class="delta down">план 8 617 млн ₽</div>
+        </div>
+      </div>
+
+      <div class="dash-frame" id="dash-frame">
+        <p class="note">
+          Здесь в целевой версии встраивается виз Tableau через Embedding API v3
+          (<code>&lt;tableau-viz&gt;</code>). Сейчас — демонстрационная подстановка:
+          ассистент переключает рабочую область событием
+          <code>ai-assistant:open-dashboard</code>, а открытый из чата дэшборд
+          подсвечивается анимацией рамки.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Демо-реакция портала на команду ассистента: переключаем активный пункт
+    // меню и подсвечиваем рабочую область (FR-3).
+    var TITLES = {
+      "/dashboards/sales": "Продажи и выручка",
+      "/dashboards/regions": "Продажи по регионам",
+      "/dashboards/clients": "Клиентская база",
+      "/dashboards/pnl": "Финансовый результат (P&L)",
+      "/dashboards/hr": "Персонал",
+      "/dashboards/marketing": "Маркетинг и воронка"
+    };
+
+    function switchDashboard(viewUrl) {
+      var links = document.querySelectorAll(".sidebar a");
+      links.forEach(function (a) {
+        a.classList.toggle("active", a.getAttribute("data-view") === viewUrl);
+      });
+      document.getElementById("dash-title").textContent =
+        TITLES[viewUrl] || "Дэшборд";
+      var frame = document.getElementById("dash-frame");
+      frame.classList.remove("flash");
+      void frame.offsetWidth;
+      frame.classList.add("flash");
+    }
+
+    window.addEventListener("ai-assistant:open-dashboard", function (e) {
+      if (e.detail && e.detail.viewUrl) switchDashboard(e.detail.viewUrl);
+    });
+
+    document.querySelectorAll(".sidebar a").forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        switchDashboard(a.getAttribute("data-view"));
+      });
+    });
+  </script>
+
+  <!-- Виджет подключается одной строкой на любую страницу портала -->
+  <script src="/widget/assistant.js" data-api="/api" defer></script>
+</body>
+</html>
