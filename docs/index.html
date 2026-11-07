@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Аналитический портал — ИИ-ассистент</title>
+<style>
+:root{--blue:#1e4fd8;--bg:#f3f4f6;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:250px;background:#0f172a;color:#cbd5e1;padding:20px 0;flex-shrink:0}
+.sidebar h1{font-size:16px;color:#fff;padding:0 20px 16px;border-bottom:1px solid #1e293b}
+.sidebar .section{padding:14px 20px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b}
+.sidebar a{display:block;padding:9px 20px;color:#cbd5e1;text-decoration:none;font-size:14px;border-left:3px solid transparent}
+.sidebar a:hover{background:#1e293b}
+.sidebar a.active{background:#1e293b;color:#fff;border-left-color:#3b82f6}
+.workspace{flex:1;padding:24px 28px;min-width:0}
+.workspace h2{font-size:22px;margin-bottom:4px}
+.meta{font-size:12.5px;color:var(--muted);margin-bottom:18px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px}
+.kpi-card{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+.kpi-card .label{font-size:12.5px;color:var(--muted)}
+.kpi-card .value{font-size:24px;font-weight:700;margin-top:4px}
+.kpi-card .delta{font-size:12.5px;margin-top:2px}
+.delta.up{color:#16a34a}.delta.down{color:#dc2626}
+.panel{background:#fff;border:2px solid transparent;border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(15,23,42,.08);transition:border-color .3s}
+.panel.flash{animation:flash 1.6s ease}
+@keyframes flash{0%{border-color:#3b82f6;box-shadow:0 0 0 6px rgba(59,130,246,.25)}100%{border-color:transparent;box-shadow:0 1px 3px rgba(15,23,42,.08)}}
+.panel h3{font-size:14px;color:var(--muted);margin-bottom:14px;font-weight:600}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+table.regions{width:100%;border-collapse:collapse;font-size:14px}
+table.regions th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.regions td{padding:8px;border-bottom:1px solid #f1f5f9}
+table.regions td:last-child,table.regions th:last-child{text-align:right}
+.pos{color:#16a34a}.neg{color:#dc2626}
+
+/* Виджет */
+#aiw-root{position:fixed;right:24px;bottom:24px;z-index:9999;font-size:14px}
+.aiw-fab{width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;background:var(--blue);color:#fff;font-size:24px;box-shadow:0 4px 16px rgba(30,79,216,.35);display:flex;align-items:center;justify-content:center;position:relative}
+.aiw-fab:hover{transform:scale(1.06)}
+.aiw-fab .dot{position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#22c55e;border:2px solid #fff}
+.aiw-panel{width:390px;height:600px;max-height:calc(100vh - 48px);background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden}
+.aiw-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--blue);color:#fff}
+.aiw-title{font-weight:600;font-size:15px}
+.aiw-sub{font-size:11px;opacity:.85}
+.aiw-close{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px}
+.aiw-messages{flex:1;overflow-y:auto;padding:14px 14px 8px;background:#f6f7fb;display:flex;flex-direction:column;gap:10px}
+.aiw-msg{max-width:85%;padding:10px 12px;border-radius:12px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+.aiw-msg-user{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px}
+.aiw-msg-bot{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+.aiw-open-btn{display:inline-block;margin-top:8px;padding:7px 12px;background:#eef2ff;color:var(--blue);border:1px solid #c7d2fe;border-radius:8px;font-size:13px;cursor:pointer}
+.aiw-open-btn:hover{background:#e0e7ff}
+.aiw-chips{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 10px;background:#f6f7fb}
+.aiw-chip{padding:6px 11px;border-radius:16px;border:1px solid #c7d2fe;background:#fff;color:var(--blue);font-size:12.5px;cursor:pointer}
+.aiw-chip:hover{background:#eef2ff}
+.aiw-typing{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;border-bottom-left-radius:4px;padding:10px 14px;display:flex;gap:4px}
+.aiw-typing span{width:6px;height:6px;border-radius:50%;background:#9ca3af;animation:bounce 1.2s infinite}
+.aiw-typing span:nth-child(2){animation-delay:.15s}
+.aiw-typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+.aiw-input-row{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:#fff}
+.aiw-input{flex:1;border:1px solid #d1d5db;border-radius:9px;padding:9px 12px;font-size:14px;outline:none}
+.aiw-input:focus{border-color:var(--blue)}
+.aiw-send{padding:9px 16px;border:none;border-radius:9px;background:var(--blue);color:#fff;font-size:14px;cursor:pointer}
+.aiw-send:disabled{background:#9ca3af}
+@media (max-width:760px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%;padding:10px 0}
+  .sidebar h1{padding-bottom:10px}
+  #aiw-root{right:12px;bottom:12px}
+  .aiw-panel{width:calc(100vw - 24px);height:calc(100vh - 90px)}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>Аналитический портал</h1>
+    <div class="section">Коммерция</div>
+    <a href="#" data-dash="sales" class="active">Продажи и выручка</a>
+    <a href="#" data-dash="regions">Продажи по регионам</a>
+    <a href="#" data-dash="clients">Клиентская база</a>
+    <div class="section">Финансы</div>
+    <a href="#" data-dash="pnl">Финансовый результат (P&L)</a>
+    <div class="section">HR</div>
+    <a href="#" data-dash="hr">Персонал</a>
+    <div class="section">Маркетинг</div>
+    <a href="#" data-dash="marketing">Маркетинг и воронка</a>
+  </nav>
+
+  <main class="workspace">
+    <h2 id="dash-title">Продажи и выручка</h2>
+    <div class="meta" id="dash-meta">Обновлено: 07.11.2026, 06:00 · источник: витрина DWH (демо)</div>
+    <div class="kpi-grid" id="kpi-grid"></div>
+    <div class="panel" id="dash-panel">
+      <h3 id="chart-title"></h3>
+      <div id="chart-body"></div>
+      <div class="legend" id="chart-legend">
+        <span><i style="background:#1e4fd8"></i>2026</span>
+        <span><i style="background:#9ca3af"></i>2025</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="aiw-root">
+  <div class="aiw-panel" id="aiw-panel">
+    <div class="aiw-header">
+      <div>
+        <div class="aiw-title">Ассистент портала</div>
+        <div class="aiw-sub">Спросите о показателях — открою нужный дэшборд</div>
+      </div>
+      <button class="aiw-close" id="aiw-close" aria-label="Свернуть">×</button>
+    </div>
+    <div class="aiw-messages" id="aiw-messages"></div>
+    <div class="aiw-chips" id="aiw-chips"></div>
+    <div class="aiw-input-row">
+      <input class="aiw-input" id="aiw-input" placeholder="Например: покажи выручку с начала года" aria-label="Сообщение ассистенту">
+      <button class="aiw-send" id="aiw-send">Отправить</button>
+    </div>
+  </div>
+  <button class="aiw-fab" id="aiw-fab" aria-label="Открыть ассистента">✦<span class="dot"></span></button>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ===== Демо-данные (помесячно, янв–окт) ===== */
+var MONTHS=["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт"];
+var METRICS={
+revenue:{title:"Выручка",unit:"млн ₽",dash:"sales",plan:8617,comment:"Рост поддерживают корпоративный сегмент и продление контрактов; октябрь закрыт выше уровня прошлого года.",
+ cur:[712,689,805,798,842,831,860,875,901,901],prev:[701,672,780,772,825,818,841,855,876,890]},
+deals:{title:"Число сделок",unit:"шт.",dash:"sales",plan:1450,comment:"Количество сделок растёт быстрее выручки — средний чек немного снижается.",
+ cur:[118,112,131,129,136,138,141,143,147,149],prev:[111,105,122,121,128,129,133,135,138,141]},
+ebitda:{title:"EBITDA",unit:"млн ₽",dash:"pnl",plan:1720,comment:"EBITDA растёт опережающе к выручке — сдерживание операционных расходов даёт эффект.",
+ cur:[128,121,149,152,163,161,168,172,180,183],prev:[117,109,136,139,148,147,152,155,162,166]},
+ebitda_margin:{title:"Рентабельность по EBITDA",unit:"%",dash:"pnl",agg:"avg",comment:"Маржинальность улучшается третий месяц подряд.",
+ cur:[18.0,17.6,18.5,19.0,19.4,19.4,19.5,19.7,20.0,20.3],prev:[16.7,16.2,17.4,18.0,17.9,18.0,18.1,18.1,18.5,18.7]},
+active_clients:{title:"Активные клиенты",unit:"компаний",dash:"clients",comment:"База растёт умеренно; отток удерживается на уровне прошлого года.",
+ cur:[1102,1115,1134,1148,1161,1174,1189,1202,1216,1231],prev:[1041,1050,1063,1075,1086,1095,1106,1115,1126,1138]},
+new_clients:{title:"Новые клиенты",unit:"компаний",dash:"clients",plan:560,comment:"Приток новых клиентов выше прошлого года за счёт сегмента СМБ.",
+ cur:[48,45,62,58,61,59,64,62,66,63],prev:[44,41,55,52,55,53,57,55,58,56]},
+fte:{title:"Численность (FTE)",unit:"чел.",dash:"hr",comment:"Численность растёт в соответствии с штатным планом, ключевой драйвер — коммерческий блок.",
+ cur:[1310,1318,1325,1331,1340,1348,1352,1361,1370,1376],prev:[1254,1258,1266,1270,1277,1283,1287,1292,1298,1304]},
+turnover:{title:"Текучесть персонала",unit:"%",dash:"hr",agg:"avg",direction:"down",plan:14,comment:"Текучесть ниже прошлого года и в пределах целевого коридора; зона внимания — ИТ-позиции.",
+ cur:[1.2,1.1,1.3,1.2,1.1,1.2,1.0,1.1,1.2,1.1],prev:[1.4,1.3,1.5,1.4,1.3,1.4,1.3,1.3,1.4,1.3]},
+leads:{title:"Лиды",unit:"шт.",dash:"marketing",plan:4600,comment:"Поток лидов стабильно выше прошлого года; качество лидов растёт вместе с количеством.",
+ cur:[390,371,442,438,465,458,472,480,495,501],prev:[356,340,402,398,421,415,428,435,449,456]},
+conversion:{title:"Конверсия лид → сделка",unit:"%",dash:"marketing",agg:"avg",comment:"Конверсия растёт на фоне квалификации лидов; пиковые значения — в конце кварталов.",
+ cur:[11.8,12.1,12.6,12.4,12.9,13.1,13.0,13.3,13.6,13.8],prev:[10.9,11.0,11.4,11.3,11.7,11.9,11.8,12.0,12.3,12.5]}
+};
+var REGIONS={title:"Продажи по регионам",unit:"млн ₽",comment:"Москва и Северо-Запад обеспечивают основной прирост; Урал и Сибирь растут ниже плана.",
+rows:[
+{name:"Москва",cur:3120,prev:2990},{name:"Северо-Запад",cur:1580,prev:1485},
+{name:"Волга",cur:1245,prev:1205},{name:"Урал",cur:985,prev:950},
+{name:"Сибирь",cur:762,prev:745},{name:"Юг",cur:522,prev:505}]};
+
+var DASHBOARDS=[
+{id:"sales",title:"Продажи и выручка",metrics:["revenue","deals"],
+ kw:["выручка","продажи","план продаж","выполнение плана","число сделок","количество сделок","сделки","оборот","доход","топлайн","revenue","sales","средний чек","продали"],
+ mk:{deals:["сделки","сделок","сделка","количество сделок","число сделок"]}},
+{id:"pnl",title:"Финансовый результат (P&L)",metrics:["ebitda","ebitda_margin"],
+ kw:["ebitda","ебитда","эбитда","прибыль","рентабельность","рентабельности","маржинальность","маржа","п&л","pnl","финансовый результат","убыток","операционная прибыль"],
+ mk:{ebitda_margin:["рентабельность","рентабельности","маржинальность","маржа"],ebitda:["ebitda","ебитда","эбитда","прибыль","операционная прибыль"]}},
+{id:"regions",title:"Продажи по регионам",metrics:["regions"],
+ kw:["регионы","регион","регионам","филиалы","филиал","география","москва","питер","санкт-петербург","северо-запад","волга","урал","сибирь","юг","по городам","по территориям","regions"],mk:{}},
+{id:"clients",title:"Клиентская база",metrics:["active_clients","new_clients"],
+ kw:["клиенты","клиент","клиентская база","база клиентов","отток","новые клиенты","активные клиенты","заказчики","контрагенты","clients","churn"],
+ mk:{new_clients:["новые клиенты","новых клиентов","приток клиентов"],active_clients:["активные клиенты","база клиентов","отток","churn"]}},
+{id:"hr",title:"Персонал (HR)",metrics:["fte","turnover"],
+ kw:["персонал","сотрудники","штат","численность","fte","текучесть","текучка","увольнения","найм","наймы","hr","кадры","люди","headcount"],
+ mk:{turnover:["текучесть","текучка","увольнения"],fte:["численность","fte","headcount","штат","найм","наймы"]}},
+{id:"marketing",title:"Маркетинг и воронка",metrics:["leads","conversion"],
+ kw:["лиды","лид","лидов","конверсия","воронка","маркетинг","реклама","трафик","обращения","заявки","leads","marketing","funnel"],
+ mk:{conversion:["конверсия","воронка","funnel"],leads:["лиды","лид","лидов","leads","заявки","обращения"]}}
+];
+var FALLBACK_CHIPS=[
+{label:"Продажи и выручка",q:"покажи выручку с начала года"},
+{label:"P&L / EBITDA",q:"какая у нас EBITDA"},
+{label:"Продажи по регионам",q:"продажи по регионам"},
+{label:"Клиенты",q:"сколько у нас клиентов"},
+{label:"Персонал",q:"текучесть кадров"},
+{label:"Маркетинг",q:"сколько лидов в этом году"}];
+var STARTER_CHIPS=[
+{label:"Выручка с начала года",q:"покажи выручку с начала года"},
+{label:"EBITDA и маржинальность",q:"какая EBITDA"},
+{label:"Продажи по регионам",q:"продажи по регионам"},
+{label:"Текучесть кадров",q:"какая текучесть персонала"}];
+
+/* ===== Аналитика (зеркало backend/app/services/analytics.py) ===== */
+function sum(a){return a.reduce(function(x,y){return x+y},0)}
+function fmt(v){if(v===Math.round(v)){return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g," ")}
+return v.toFixed(1).replace(".",",").replace(/\B(?=(\d{3})+(?!\d))/g," ")}
+function fmtPct(v){return v.toFixed(1).replace(".",",")}
+function quality(m,yoy){
+ if(m.direction==="down"){
+  if(yoy<=-5)return "уверенное снижение";if(yoy<=-2)return "снижение";
+  if(yoy<2)return "стабильный уровень";if(yoy<5)return "небольшой рост";return "рост"}
+ if(yoy>=5)return "уверенный рост";if(yoy>=2)return "умеренный рост";
+ if(yoy>-2)return "стабильный уровень";if(yoy>-5)return "небольшое снижение";return "снижение"}
+function kpi(id){
+ var m=METRICS[id];var isRate=m.agg==="avg";
+ var ytd=isRate?Math.round(sum(m.cur)/m.cur.length*10)/10:sum(m.cur);
+ var ytdPrev=isRate?Math.round(sum(m.prev)/m.prev.length*10)/10:sum(m.prev);
+ var yoy=Math.round((ytd/ytdPrev-1)*1000)/10;
+ var planPct=(m.plan&&!isRate)?Math.round(ytd/m.plan*1000)/10:null;
+ return{metric:m.title,unit:m.unit,ytd:ytd,ytdPrev:ytdPrev,yoy:yoy,plan:m.plan||null,planPct:planPct,quality:quality(m,yoy),comment:m.comment}}
+function sentence(k){
+ var period=k.unit==="%"?"в среднем за период":"YTD";
+ var parts=[k.metric+" "+period+": "+fmt(k.ytd)+" "+k.unit];
+ var sign=k.yoy>=0?"+":"−";
+ parts.push(sign+fmtPct(Math.abs(k.yoy))+"% к аналогичному периоду прошлого года ("+k.quality+")");
+ if(k.planPct!==null)parts.push("выполнение плана — "+fmtPct(k.planPct)+"%");
+ else if(k.plan)parts.push("целевой коридор — до "+fmt(k.plan)+" "+k.unit);
+ return parts.join(" — ")+"."}
+function regionsText(){
+ var total=0,totalPrev=0;
+ REGIONS.rows.forEach(function(r){total+=r.cur;totalPrev+=r.prev});
+ var yoy=Math.round((total/totalPrev-1)*1000)/10;
+ var top=REGIONS.rows[0];
+ var lines=["Выручка по регионам YTD: "+fmt(total)+" "+REGIONS.unit+" (+"+fmtPct(yoy)+"% к АППГ).",
+ "Крупнейший регион — "+top.name+": "+fmt(top.cur)+" "+REGIONS.unit+" (+"+fmtPct((top.cur/top.prev-1)*100)+"%)."];
+ REGIONS.rows.forEach(function(r){
+  var y=Math.round((r.cur/r.prev-1)*1000)/10;
+  lines.push("• "+r.name+": "+fmt(r.cur)+" "+REGIONS.unit+" ("+(y>=0?"+":"−")+fmtPct(Math.abs(y))+"%)")});
+ lines.push(REGIONS.comment);
+ return lines.join("\n")}
+
+/* ===== NLU: словарный роутинг (зеркало router.py) ===== */
+function norm(t){return t.toLowerCase().replace(/ё/g,"е").replace(/[^\w\s%&/+-]/g," ").replace(/\s+/g," ").trim()}
+function stem(w){return w.length>=5?w.slice(0,Math.max(3,w.length-2)):w}
+function kwHits(kw,words,joined){
+ var k=norm(kw);var kws=k.split(" ");
+ if(kws.length>1)return joined.indexOf(k)>=0?2*kws.length+2:0;
+ if(k==="сделки")return words.some(function(w){return["сделка","сделки","сделок","сделкам","сделками"].indexOf(w)>=0})?2:0;
+ var s=stem(k);
+ return words.some(function(w){return(s.length>=3&&w.indexOf(s)===0)||w===k})?2:0}
+function route(text){
+ var joined=norm(text),words=joined.split(" ");
+ var best=null,bestScore=0;
+ DASHBOARDS.forEach(function(d){
+  var score=0;d.kw.forEach(function(k){score+=kwHits(k,words,joined)});
+  if(score>bestScore){bestScore=score;best=d.id}});
+ return bestScore>0?best:null}
+function routeWithContext(text,last){
+ var t=norm(text);
+ if(last&&["а по регионам","по регионам","а по филиалам","по филиалам"].some(function(p){return t.indexOf(p)>=0}))return "regions";
+ return route(text)}
+function dashById(id){return DASHBOARDS.filter(function(d){return d.id===id})[0]}
+function routeMetrics(text,id){
+ var d=dashById(id);var joined=norm(text),words=joined.split(" ");
+ var picked=[];
+ Object.keys(d.mk||{}).forEach(function(mid){
+  if(d.mk[mid].some(function(k){return kwHits(k,words,joined)>0}))picked.push(mid)});
+ return picked.length?picked:d.metrics.slice()}
+function insight(id,metrics){
+ if(id==="regions")return regionsText();
+ var parts=[],comments=[];
+ metrics.forEach(function(mid){
+  var k=kpi(mid);parts.push(sentence(k));if(k.comment)comments.push(k.comment)});
+ if(comments.length)parts.push(comments.slice(0,2).join(" "));
+ return parts.join("\n")}
+
+/* ===== Рабочая область портала ===== */
+function switchDashboard(id){
+ var d=dashById(id);if(!d)return;
+ document.querySelectorAll(".sidebar a").forEach(function(a){
+  a.classList.toggle("active",a.getAttribute("data-dash")===id)});
+ document.getElementById("dash-title").textContent=d.title;
+ renderKpis(d);renderChart(d);
+ var p=document.getElementById("dash-panel");
+ p.classList.remove("flash");void p.offsetWidth;p.classList.add("flash")}
+function renderKpis(d){
+ var grid=document.getElementById("kpi-grid");grid.innerHTML="";
+ if(d.id==="regions"){
+  var total=0,totalPrev=0;
+  REGIONS.rows.forEach(function(r){total+=r.cur;totalPrev+=r.prev});
+  var yoy=(total/totalPrev-1)*100;
+  grid.appendChild(kpiCard("Выручка по регионам YTD",fmt(total)+" млн ₽","+"+fmtPct(yoy)+"% к АППГ",true));
+  REGIONS.rows.slice(0,3).forEach(function(r){
+   var y=(r.cur/r.prev-1)*100;
+   grid.appendChild(kpiCard(r.name,fmt(r.cur)+" млн ₽",(y>=0?"+":"−")+fmtPct(Math.abs(y))+"% к АППГ",y>=0))});
+  return}
+ d.metrics.forEach(function(mid){
+  var k=kpi(mid);
+  var delta=(k.yoy>=0?"+":"−")+fmtPct(Math.abs(k.yoy))+"% к АППГ";
+  if(k.planPct!==null)delta+=" · план "+fmtPct(k.planPct)+"%";
+  grid.appendChild(kpiCard(k.metric+(k.unit==="%"?" (среднее)":" YTD"),fmt(k.ytd)+" "+k.unit,delta,k.yoy>=0))})}
+function kpiCard(label,value,delta,up){
+ var c=document.createElement("div");c.className="kpi-card";
+ var l=document.createElement("div");l.className="label";l.textContent=label;
+ var v=document.createElement("div");v.className="value";v.textContent=value;
+ var dd=document.createElement("div");dd.className="delta "+(up?"up":"down");dd.textContent=delta;
+ c.appendChild(l);c.appendChild(v);c.appendChild(dd);return c}
+function renderChart(d){
+ var body=document.getElementById("chart-body");
+ var legend=document.getElementById("chart-legend");
+ var title=document.getElementById("chart-title");
+ if(d.id==="regions"){
+  title.textContent="Выручка по регионам, YTD";
+  legend.style.display="none";
+  var html="<table class='regions'><tr><th>Регион</th><th>YTD, млн ₽</th><th>К АППГ</th></tr>";
+  REGIONS.rows.forEach(function(r){
+   var y=Math.round((r.cur/r.prev-1)*1000)/10;
+   html+="<tr><td>"+r.name+"</td><td>"+fmt(r.cur)+"</td><td class='"+(y>=0?"pos":"neg")+"'>"+(y>=0?"+":"−")+fmtPct(Math.abs(y))+"%</td></tr>"});
+  body.innerHTML=html+"</table>";return}
+ legend.style.display="flex";
+ var m=METRICS[d.metrics[0]];
+ title.textContent=m.title+" по месяцам, "+m.unit;
+ body.innerHTML=lineChart(m.cur,m.prev,m.unit)}
+function lineChart(cur,prev,unit){
+ var W=760,H=240,pl=44,pr=12,pt=14,pb=28;
+ var all=cur.concat(prev);
+ var max=Math.max.apply(null,all),min=Math.min.apply(null,all);
+ if(max===min){max+=1;min-=1}
+ var span=max-min;max+=span*0.08;min-=span*0.08;
+ function x(i){return pl+i*(W-pl-pr)/(cur.length-1)}
+ function y(v){return pt+(max-v)/(max-min)*(H-pt-pb)}
+ function path(arr){return arr.map(function(v,i){return(i?"L":"M")+x(i).toFixed(1)+","+y(v).toFixed(1)}).join(" ")}
+ var svg="<svg viewBox='0 0 "+W+" "+H+"' style='width:100%;height:auto' role='img'>";
+ for(var g=0;g<=4;g++){
+  var gv=min+(max-min)*g/4;var gy=y(gv);
+  svg+="<line x1='"+pl+"' y1='"+gy+"' x2='"+(W-pr)+"' y2='"+gy+"' stroke='#f1f5f9'/>";
+  svg+="<text x='"+(pl-6)+"' y='"+(gy+4)+"' text-anchor='end' font-size='10' fill='#9ca3af'>"+fmt(Math.round(gv*10)/10)+"</text>"}
+ MONTHS.forEach(function(mo,i){
+  svg+="<text x='"+x(i)+"' y='"+(H-8)+"' text-anchor='middle' font-size='10' fill='#9ca3af'>"+mo+"</text>"});
+ svg+="<path d='"+path(prev)+"' fill='none' stroke='#9ca3af' stroke-width='2' stroke-dasharray='5 4'/>";
+ svg+="<path d='"+path(cur)+"' fill='none' stroke='#1e4fd8' stroke-width='2.5'/>";
+ cur.forEach(function(v,i){
+  svg+="<circle cx='"+x(i)+"' cy='"+y(v)+"' r='3' fill='#1e4fd8'><title>"+MONTHS[i]+" 2026: "+fmt(v)+" "+unit+"</title></circle>"});
+ return svg+"</svg>"}
+
+/* ===== Чат-виджет ===== */
+var state={open:false,busy:false,lastIntent:null,started:false};
+var panel=document.getElementById("aiw-panel"),fab=document.getElementById("aiw-fab"),
+messages=document.getElementById("aiw-messages"),chipsRow=document.getElementById("aiw-chips"),
+input=document.getElementById("aiw-input"),sendBtn=document.getElementById("aiw-send");
+function scrollDown(){messages.scrollTop=messages.scrollHeight}
+function addMsg(role,text,dashId){
+ var m=document.createElement("div");m.className="aiw-msg aiw-msg-"+role;m.textContent=text;
+ if(role==="bot"&&dashId){
+  var d=dashById(dashId);
+  var b=document.createElement("button");b.className="aiw-open-btn";b.textContent="Открыть дэшборд: "+d.title;
+  b.addEventListener("click",function(){switchDashboard(dashId)});
+  m.appendChild(document.createElement("br"));m.appendChild(b)}
+ messages.appendChild(m);scrollDown();return m}
+function renderChips(chips){
+ chipsRow.innerHTML="";
+ chips.forEach(function(c){
+  var b=document.createElement("button");b.className="aiw-chip";b.textContent=c.label;
+  b.addEventListener("click",function(){send(c.q)});chipsRow.appendChild(b)});
+ chipsRow.style.display=chips.length?"flex":"none"}
+function typing(on){
+ var t=document.getElementById("aiw-typing");
+ if(on){
+  if(t)return;
+  t=document.createElement("div");t.className="aiw-typing";t.id="aiw-typing";
+  t.innerHTML="<span></span><span></span><span></span>";
+  messages.appendChild(t);scrollDown()}
+ else if(t)t.remove()}
+function answer(text){
+ var intent=routeWithContext(text,state.lastIntent);
+ if(!intent){
+  return{reply:"Не удалось распознать запрос. Я могу показать ключевые показатели компании — выберите направление ниже или уточните формулировку.",dash:null,chips:FALLBACK_CHIPS}}
+ state.lastIntent=intent;
+ return{reply:insight(intent,routeMetrics(text,intent)),dash:intent,chips:[]}}
+function send(text){
+ text=(text||"").trim();if(!text||state.busy)return;
+ state.busy=true;sendBtn.disabled=true;
+ input.value="";renderChips([]);addMsg("user",text);typing(true);
+ setTimeout(function(){
+  typing(false);
+  var r=answer(text);
+  addMsg("bot",r.reply,r.dash);
+  if(r.chips.length)renderChips(r.chips);
+  if(r.dash)switchDashboard(r.dash);
+  state.busy=false;sendBtn.disabled=false;input.focus()},600+Math.random()*400)}
+function toggle(open){
+ state.open=open;
+ panel.style.display=open?"flex":"none";
+ fab.style.display=open?"none":"flex";
+ if(open){
+  if(!state.started){
+   state.started=true;
+   addMsg("bot","Здравствуйте! Спросите о показателях компании в свободной форме — я дам краткий вывод и открою нужный дэшборд.");
+   renderChips(STARTER_CHIPS)}
+  input.focus();scrollDown()}}
+fab.addEventListener("click",function(){toggle(true)});
+document.getElementById("aiw-close").addEventListener("click",function(){toggle(false)});
+sendBtn.addEventListener("click",function(){send(input.value)});
+input.addEventListener("keydown",function(e){if(e.key==="Enter")send(input.value)});
+document.querySelectorAll(".sidebar a").forEach(function(a){
+ a.addEventListener("click",function(ev){ev.preventDefault();switchDashboard(a.getAttribute("data-dash"))})});
+switchDashboard("sales");
+})();
+</script>
+</body>
+</html>
